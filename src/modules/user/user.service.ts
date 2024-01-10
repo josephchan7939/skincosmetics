@@ -1,11 +1,41 @@
 import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { isEmpty } from 'lodash';
+import { generateUUID } from '@/helper/uuid';
+import { MD5 } from '@/helper/crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+
 
 @Injectable()
 export class UserService {
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+   constructor(@InjectRepository(User) private userRepo:Repository<User>){
+
+   }
+
+ async create(createUserDto: CreateUserDto) {
+    const user = await this.userRepo.findOneBy({email:createUserDto.email})
+    if (!isEmpty(user))
+    throw new Error(`user email '${createUserDto.email}' has existed!`);
+
+    const salt = generateUUID(32);
+    let passAfterCrypt = MD5(`${createUserDto.password}${salt}`);
+
+    try{
+     const user =  this.userRepo.create({
+    ...createUserDto,
+    psalt:salt,
+    password:passAfterCrypt
+    });
+
+   const userSaved = await this.userRepo.save(user)
+    return userSaved;
+  }
+   catch(error){
+    throw error;
+   }
   }
 
   findAll() {
